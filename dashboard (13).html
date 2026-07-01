@@ -1,0 +1,1933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rider FAD Dashboard - Sunthar</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --ink:#1b2430;
+  --paper:#eef1f6;
+  --panel:#ffffff;
+  --line:#dfe4eb;
+  --rail:#101a2b;
+  --rail-soft:#1d2e47;
+  --signal:#2f6fed;
+  --signal-soft:#e8f0fe;
+  --good:#15803d;
+  --good-soft:#e1f5e9;
+  --warn:#b45309;
+  --warn-soft:#fdf0dc;
+  --bad:#b91c1c;
+  --bad-soft:#fbe4e4;
+  --muted:#64748b;
+  --font-display:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-body:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono','Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  font-family:var(--font-body);
+  background:var(--paper);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  font-size:14px;
+  line-height:1.5;
+}
+::selection{background:var(--signal-soft);color:var(--ink);}
+
+.rail{
+  background:var(--rail);
+  color:#f3f5f8;
+  padding:18px 28px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  flex-wrap:wrap;
+  border-bottom:3px solid var(--signal);
+}
+.rail-left{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+.rail-title{font-family:var(--font-display);font-size:21px;font-weight:700;letter-spacing:-0.01em;}
+.rail-sub{font-size:11.5px;color:#9fb0c9;font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.08em;}
+.rail-right{display:flex;align-items:center;gap:10px;}
+.pill{
+  font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+  padding:6px 12px;border-radius:20px;border:1px solid rgba(243,245,248,.2);
+  color:#dfe6f0;display:flex;align-items:center;gap:6px;
+}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);display:inline-block;}
+.dot.live{background:#34d399;box-shadow:0 0 0 3px rgba(52,211,153,.18);}
+.dot.empty{background:#f87171;}
+.dot.busy{background:var(--warn);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+.btn{
+  font-family:var(--font-body);font-size:12.5px;font-weight:600;padding:8px 16px;border-radius:7px;
+  border:1px solid transparent;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease, background .15s ease;
+  letter-spacing:.01em;
+}
+.btn:active{transform:translateY(1px);}
+.btn-ghost{background:transparent;border-color:rgba(243,245,248,.28);color:#f3f5f8;}
+.btn-ghost:hover{background:rgba(243,245,248,.1);}
+.btn-signal{background:var(--signal);color:#fff;}
+.btn-signal:hover{box-shadow:0 4px 14px rgba(47,111,237,.35);}
+.btn-line{background:var(--panel);border-color:var(--line);color:var(--ink);}
+.btn-line:hover{border-color:var(--signal);}
+.btn-bad{background:var(--bad-soft);color:var(--bad);border-color:transparent;}
+.btn-bad:hover{background:var(--bad);color:#fff;}
+.btn[disabled]{opacity:.4;cursor:not-allowed;}
+.btn-sm{padding:6px 11px;font-size:11.5px;border-radius:6px;}
+
+.wrap{max-width:1560px;margin:0 auto;padding:26px 28px 70px;}
+.hidden{display:none !important;}
+
+.gate-row{display:flex;align-items:center;gap:8px;}
+.gate-input{
+  font-family:var(--font-mono);font-size:12.5px;padding:7px 10px;border-radius:6px;
+  border:1px solid rgba(243,245,248,.28);background:rgba(0,0,0,.18);color:#f3f5f8;width:140px;
+}
+.gate-input::placeholder{color:#8295ad;}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:22px;}
+.admin-split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 14px; }
+@media(max-width: 768px){ .admin-split { grid-template-columns: 1fr; } }
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+.panel-eyebrow{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--signal);font-weight:600;}
+.panel-title{font-family:var(--font-display);font-size:19px;font-weight:700;margin-top:3px;}
+
+.dropzone{
+  border:2px dashed var(--line);border-radius:10px;padding:34px 20px;text-align:center;cursor:pointer;
+  transition:border-color .15s, background .15s;background:#fafbfd;height: 100%; display: flex; flex-direction: column; justify-content: center;
+}
+.dropzone:hover, .dropzone.drag{border-color:var(--signal);background:var(--signal-soft);}
+.dropzone-icon{font-size:28px;margin-bottom:8px;}
+.dropzone-text{font-weight:600;font-size:14.5px;}
+.dropzone-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+#fileInput, #jsonFileInput{display:none;}
+
+.progress-wrap{margin-top:18px; grid-column: 1 / -1;}
+.progress-label{
+  display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;margin-bottom:6px;
+  font-family:var(--font-mono);
+}
+.progress-track{
+  height:10px;background:#e7ebf1;border-radius:6px;overflow:hidden;border:1px solid var(--line);
+}
+.progress-fill{
+  height:100%;background:linear-gradient(90deg,var(--signal),#6f9bf2);width:0%;
+  transition:width .25s ease;border-radius:6px;
+}
+.progress-fill.pulse { animation: loadPulse 2s infinite ease-in-out; background-size: 200% 100%; }
+@keyframes loadPulse { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+.progress-stage{font-size:12px;color:var(--muted);margin-top:6px;}
+
+.error-box{
+  grid-column: 1 / -1; margin-top:14px;padding:14px 16px;background:var(--bad-soft);border:1px solid var(--bad);
+  border-radius:8px;font-size:13px;color:var(--bad);display:none;
+}
+.error-box.show{display:block;}
+
+.merge-summary{margin-top:20px; grid-column: 1 / -1;}
+.merge-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:14px 0;}
+.merge-card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#fafbfd;}
+.merge-card .n{font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--rail);}
+.merge-card .l{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:2px;}
+
+.source-chip{
+  display:flex;align-items:center;gap:8px;padding:8px 8px 8px 14px;border:1px solid var(--line);
+  border-radius:8px;background:#fff;font-size:12.5px;font-weight:600;
+}
+.source-chip .sc-name{color:var(--ink);}
+.source-chip .sc-count{font-family:var(--font-mono);font-size:11px;color:var(--muted);font-weight:500;}
+.source-chip .sc-remove{
+  background:var(--bad-soft);color:var(--bad);border:none;border-radius:6px;width:22px;height:22px;
+  cursor:pointer;font-weight:700;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;
+}
+.source-chip .sc-remove:hover{background:var(--bad);color:#fff;}
+.source-chip.new{border-color:var(--good);background:var(--good-soft);}
+.source-chip.replaced{border-color:var(--warn);background:var(--warn-soft);}
+
+.table-preview-wrap{
+  overflow-x:auto;border:1px solid var(--line);border-radius:8px;margin-top:14px;max-height:280px;overflow-y:auto;
+}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+thead th{
+  position:sticky;top:0;background:var(--rail);color:#f3f5f8;text-align:center;padding:10px 12px;
+  font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;
+  cursor:pointer;user-select:none;
+}
+thead th:hover{background:var(--rail-soft);}
+thead th .th-inner{display:flex;align-items:center;justify-content:center;gap:5px;}
+thead th .sort-arrow{font-size:9px;opacity:.5;font-family:var(--font-mono);}
+thead th.sorted .sort-arrow{opacity:1;color:#9ec1ff;}
+thead th.no-sort{cursor:default;}
+thead th.no-sort:hover{background:var(--rail);}
+tbody td{padding:8px 12px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:center;}
+tbody tr:hover{background:var(--signal-soft);}
+tbody tr:nth-child(even){background:#fafbfd;}
+tbody tr:nth-child(even):hover{background:var(--signal-soft);}
+tbody td.num{font-family:var(--font-mono);text-align:center;}
+.src-tag{font-family:var(--font-mono);font-size:10.5px;background:var(--rail-soft);color:#fff;padding:2px 7px;border-radius:4px;}
+.pct-pill{font-family:var(--font-mono);font-weight:700;padding:2px 9px;border-radius:12px;font-size:11.5px;display:inline-block;}
+.pct-good{background:var(--good-soft);color:var(--good);}
+.pct-warn{background:var(--warn-soft);color:var(--warn);}
+.pct-bad{background:var(--bad-soft);color:var(--bad);}
+
+.action-row{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;align-items:center;}
+.save-msg{font-size:12.5px;color:var(--good);font-weight:600;}
+
+.empty-state{text-align:center;padding:90px 20px;color:var(--muted);}
+.empty-state .big{font-family:var(--font-display);font-size:24px;color:var(--ink);margin-bottom:8px;font-weight:700;}
+.empty-state .small{font-size:13.5px;}
+
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:22px;}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;}
+.kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--signal);}
+.kpi-label{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+.kpi-value{font-family:var(--font-display);font-size:28px;font-weight:700;margin-top:6px;color:var(--rail);}
+.kpi-foot{font-size:11.5px;color:var(--muted);margin-top:4px;}
+
+.charts-row{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-bottom:16px;}
+@media (max-width:880px){.charts-row{grid-template-columns:1fr;}}
+.chart-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;}
+.chart-card h3{font-family:var(--font-display);font-size:15.5px;font-weight:700;margin-bottom:14px;}
+.chart-box{position:relative;height:260px;}
+.chart-box.tall{height:360px;}
+.chart-note{font-size:12px;color:var(--muted);margin-top:12px;}
+
+.data-section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;margin-top:4px;}
+.data-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+.data-head h3{font-family:var(--font-display);font-size:15.5px;font-weight:700;}
+.search-input{
+  font-family:var(--font-body);font-size:13px;padding:8px 12px;border:1px solid var(--line);border-radius:7px;
+  width:240px;background:#fafbfd;
+}
+.search-input:focus{outline:none;border-color:var(--signal);}
+.filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.row-count{font-size:12px;color:var(--muted);font-family:var(--font-mono);}
+.pager{display:flex;align-items:center;gap:8px;margin-top:12px;justify-content:flex-end;}
+.pager button{
+  font-family:var(--font-mono);font-size:12px;padding:5px 10px;border:1px solid var(--line);
+  background:#fafbfd;border-radius:6px;cursor:pointer;
+}
+.pager button:hover{border-color:var(--signal);}
+.pager button[disabled]{opacity:.35;cursor:not-allowed;}
+.pager span{font-family:var(--font-mono);font-size:12px;color:var(--muted);}
+
+/* ---- Tabs ---- */
+.tabs{display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+.tab-btn{
+  font-family:var(--font-body);font-weight:600;font-size:12.5px;padding:11px 16px;background:transparent;
+  border:none;border-bottom:3px solid transparent;color:var(--muted);cursor:pointer;margin-bottom:-1px;
+  transition:color .15s, border-color .15s;white-space:nowrap;
+}
+.tab-btn:hover{color:var(--ink);}
+.tab-btn.active{color:var(--rail);border-bottom-color:var(--signal);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* ---- Global filter bar ---- */
+.filterbar-wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:18px;}
+.filterbar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+.filterbar-title{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;}
+.filterbar-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.filter-chip{
+  position:relative;font-family:var(--font-body);font-size:12.5px;font-weight:600;padding:7px 12px;
+  border:1px solid var(--line);border-radius:8px;background:#fafbfd;cursor:pointer;display:flex;align-items:center;gap:6px;
+  color:var(--ink);
+}
+.filter-chip:hover{border-color:var(--signal);}
+.filter-chip.active{background:var(--signal-soft);border-color:var(--signal);color:var(--rail);}
+.filter-chip.open{border-color:var(--signal);box-shadow:0 0 0 3px var(--signal-soft);}
+.filter-chip .fc-count{
+  background:var(--rail);color:#fff;font-family:var(--font-mono);font-size:10px;border-radius:10px;
+  padding:1px 6px;
+}
+.filter-chip.active .fc-count{background:var(--signal);}
+.filter-chip .fc-arrow{font-size:9px;opacity:.6;}
+
+.filter-popover{
+  position:fixed;z-index:200;width:280px;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 14px 38px rgba(16,26,43,.22);display:flex;flex-direction:column;max-height:380px;
+}
+.filter-popover-head{padding:10px;border-bottom:1px solid var(--line);}
+.filter-popover-head .search-input{width:100%;margin-bottom:8px;}
+.filter-popover-actions{display:flex;justify-content:space-between;align-items:center;}
+.filter-popover-actions button{
+  font-family:var(--font-mono);font-size:11px;background:none;border:none;color:var(--signal);cursor:pointer;font-weight:600;
+}
+.filter-popover-note{font-size:10.5px;color:var(--muted);font-family:var(--font-mono);}
+.filter-popover-list{overflow-y:auto;padding:6px 4px;flex:1;}
+.fp-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12.5px;}
+.fp-item:hover{background:var(--signal-soft);}
+.fp-item input{accent-color:var(--signal);}
+.fp-item label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
+.filter-popover-foot{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);}
+.filter-popover-foot .btn{flex:1;text-align:center;}
+
+footer{text-align:center;padding:28px;font-size:11.5px;color:var(--muted);font-family:var(--font-mono);}
+</style>
+</head>
+<body>
+
+<div class="rail">
+  <div class="rail-left">
+    <div class="rail-title">Rider FAD Dashboard - Sunthar</div>
+    <div class="rail-sub" id="dataAsOf">No data loaded</div>
+  </div>
+  <div class="rail-right">
+    <div class="pill"><span class="dot" id="statusDot"></span><span id="statusText">Checking storage…</span></div>
+    <div class="gate-row" id="gateRow">
+      <input type="password" class="gate-input" id="adminPass" placeholder="Admin code">
+      <button class="btn btn-ghost" id="unlockBtn">Unlock</button>
+    </div>
+    <button class="btn btn-ghost hidden" id="lockBtn">Lock admin</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="panel hidden" id="adminPanel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-eyebrow">Admin Panel</div>
+        <div class="panel-title">Data Ingestion Hub</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;" id="syncStatusLine">Checking shared report status…</div>
+      </div>
+    </div>
+
+    <div class="admin-split">
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-icon">📊</div>
+        <div class="dropzone-text">Drop Raw CSV Files (one or more)</div>
+        <div class="dropzone-sub">Each file becomes its own named sheet below. Dropping a file with the same name as an existing sheet replaces it — handy for swapping just one daily sheet.</div>
+        <input type="file" id="fileInput" accept=".csv" multiple>
+      </div>
+
+      <div class="dropzone" id="jsonDropzone" style="background:#f6f8fb; border-color:#cfdcee;">
+        <div class="dropzone-icon">📦</div>
+        <div class="dropzone-text" style="color:var(--rail);">Drop a Master JSON Backup</div>
+        <div class="dropzone-sub">Restores a previously downloaded backup into your working sheets below (does not publish by itself).</div>
+        <input type="file" id="jsonFileInput" accept=".json">
+      </div>
+
+      <div class="panel" style="grid-column:1/-1;margin:0;padding:16px;background:#fafbfd;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+          <div class="panel-eyebrow" style="color:var(--rail);">Working Sheets (staged, not yet published)</div>
+          <span class="row-count" id="sourcesEmptyHint"></span>
+        </div>
+        <div id="sourcesPanel" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+
+      <div class="progress-wrap hidden" id="progressWrap">
+        <div class="progress-label"><span id="progressStageLabel">Processing files…</span><span id="progressPct"></span></div>
+        <div class="progress-track"><div class="progress-fill pulse" id="progressFill" style="width: 100%;"></div></div>
+        <div class="progress-stage" id="progressDetail">Initializing arrays...</div>
+      </div>
+
+      <div class="error-box" id="errorBox">
+        <b>Processing error</b>
+        <span id="errorDetail"></span>
+      </div>
+
+      <div class="action-row" style="grid-column:1/-1;">
+        <button class="btn btn-signal" id="publishBtn">🚀 Publish Report to Team</button>
+        <button class="btn btn-bad" id="clearAllBtn">🗑 Clear All Reports</button>
+        <button class="btn btn-line btn-sm" id="downloadMasterJsonBtn">⬇ Download Master JSON (optional backup)</button>
+      </div>
+
+      <div class="merge-summary hidden" id="mergeSummary">
+        <div class="merge-grid" id="mergeGrid"></div>
+        <div class="action-row">
+          <span class="save-msg" id="saveMsg">✓ Working sheets updated below — click "Publish Report to Team" when ready.</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="empty-state" id="emptyState">
+    <div class="big" id="emptyStateTitle">Checking for a published report…</div>
+    <div class="small" id="emptyStateBody">If your admin has already published a report, it will appear here automatically — no upload needed. If nothing loads in a moment, no report has been published yet. Admins: enter the passcode above to unlock the ingestion panel. Default admin code: <b>Contact Admin Sunthara Mahalingam 9500400427</b></div>
+  </div>
+
+  <div id="dashboardArea" class="hidden">
+
+    <div class="filterbar-wrap">
+      <div class="filterbar-head">
+        <div class="filterbar-title">Global Filters (applies to every tab below — AWB number excluded — filters narrow each other automatically)</div>
+        <button class="filterbar-reset" id="resetFiltersBtn" style="font-family:var(--font-mono);font-size:11.5px;color:var(--bad);background:none;border:none;cursor:pointer;font-weight:600;">Clear all filters</button>
+      </div>
+      <div class="filterbar-chips" id="filterChips"></div>
+    </div>
+
+    <div class="tabs" id="tabBar">
+      <button class="tab-btn active" data-tab="overview">Overview</button>
+      <button class="tab-btn" data-tab="hubsummary">Hub Wise Summary</button>
+      <button class="tab-btn" data-tab="hubclosure">Hub Wise Status Closure</button>
+      <button class="tab-btn" data-tab="ridersummary">Rider Wise Summary</button>
+      <button class="tab-btn" data-tab="riderclosure">Rider Wise Status Closure</button>
+      <button class="tab-btn" data-tab="fakerunsheet">Fake Runsheet</button>
+      <button class="tab-btn" data-tab="trend">Status Trend</button>
+      <button class="tab-btn" data-tab="rawdata">Raw Data</button>
+    </div>
+
+    <!-- TAB: Overview -->
+    <div class="tab-panel active" id="tab-overview">
+      <div class="kpi-row" id="kpiRow"></div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3 id="chart1Title">Records by Source File</h3>
+          <div class="chart-box"><canvas id="chart1"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3 id="chart2Title">Distribution</h3>
+          <div class="chart-box"><canvas id="chart2"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Hub Wise Summary -->
+    <div class="tab-panel" id="tab-hubsummary">
+      <div class="data-section">
+        <div class="data-head">
+          <h3>Hub Wise Summary Report</h3>
+          <div class="filter-row">
+            <button class="btn btn-line btn-sm" id="exportHubSummaryBtn">⬇ Export CSV</button>
+            <span class="row-count" id="hubSummaryRowCount"></span>
+          </div>
+        </div>
+        <div class="table-preview-wrap" style="max-height:560px;">
+          <table><thead><tr id="hubSummaryHead"></tr></thead><tbody id="hubSummaryBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Hub Wise Status Closure -->
+    <div class="tab-panel" id="tab-hubclosure">
+      <div class="data-section">
+        <div class="data-head">
+          <h3>Hub Wise Status at Closure Report</h3>
+          <div class="filter-row">
+            <button class="btn btn-line btn-sm" id="exportHubClosureBtn">⬇ Export CSV</button>
+            <span class="row-count" id="hubClosureRowCount"></span>
+          </div>
+        </div>
+        <div class="table-preview-wrap" style="max-height:560px;">
+          <table><thead><tr id="hubClosureHead"></tr></thead><tbody id="hubClosureBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Rider Wise Summary -->
+    <div class="tab-panel" id="tab-ridersummary">
+      <div class="data-section">
+        <div class="data-head">
+          <h3>Rider Wise Summary Report</h3>
+          <div class="filter-row">
+            <button class="btn btn-line btn-sm" id="exportRiderSummaryBtn">⬇ Export CSV</button>
+            <span class="row-count" id="riderSummaryRowCount"></span>
+          </div>
+        </div>
+        <div class="table-preview-wrap" style="max-height:560px;">
+          <table><thead><tr id="riderSummaryHead"></tr></thead><tbody id="riderSummaryBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Rider Wise Status Closure -->
+    <div class="tab-panel" id="tab-riderclosure">
+      <div class="data-section">
+        <div class="data-head">
+          <h3>Rider Wise Status at Closure Report</h3>
+          <div class="filter-row">
+            <button class="btn btn-line btn-sm" id="exportRiderClosureBtn">⬇ Export CSV</button>
+            <span class="row-count" id="riderClosureRowCount"></span>
+          </div>
+        </div>
+        <div class="table-preview-wrap" style="max-height:560px;">
+          <table><thead><tr id="riderClosureHead"></tr></thead><tbody id="riderClosureBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Fake Runsheet -->
+    <div class="tab-panel" id="tab-fakerunsheet">
+      <div class="data-section">
+        <div class="data-head">
+          <h3>Fake Runsheet Report</h3>
+          <div class="filter-row">
+            <select class="search-input" id="fakeRunsheetFilter" style="width:170px;">
+              <option value="all">Fake Runsheet: All</option>
+              <option value="Yes">Fake Runsheet: Yes</option>
+              <option value="No">Fake Runsheet: No</option>
+            </select>
+            <button class="btn btn-line btn-sm" id="exportFakeRunsheetBtn">⬇ Export CSV</button>
+            <span class="row-count" id="fakeRunsheetRowCount"></span>
+          </div>
+        </div>
+        <div class="table-preview-wrap" style="max-height:560px;">
+          <table><thead><tr id="fakeRunsheetHead"></tr></thead><tbody id="fakeRunsheetBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: Status Trend -->
+    <div class="tab-panel" id="tab-trend">
+      <div class="chart-card">
+        <h3>AWB Count by Update Time (30-min buckets)</h3>
+        <div class="chart-box tall"><canvas id="trendChart"></canvas></div>
+        <div class="chart-note" id="trendNote"></div>
+      </div>
+    </div>
+
+    <!-- TAB: Raw Data -->
+    <div class="tab-panel" id="tab-rawdata">
+      <div class="data-section">
+        <div class="data-head">
+          <h3>Raw Data</h3>
+          <div class="filter-row">
+            <button class="btn btn-line btn-sm" id="exportLiveBtn">⬇ Export Current View (CSV)</button>
+            <input class="search-input" id="searchBox" placeholder="Search all columns…">
+            <span class="row-count" id="rowCount"></span>
+          </div>
+        </div>
+        <div class="table-preview-wrap" style="max-height:520px;">
+          <table><thead><tr id="mainHead"></tr></thead><tbody id="mainBody"></tbody></table>
+        </div>
+        <div class="pager">
+          <button id="prevPage">← Prev</button>
+          <span id="pageInfo">Page 1</span>
+          <button id="nextPage">Next →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<footer>Rider FAD Dashboard - Sunthar · Local-only processing</footer>
+
+<script>
+(function(){
+  const ADMIN_CODE = "Sunthar12@";
+
+  // ---------------------------------------------------------------
+  // SHARED BACKEND CONFIG — required for team members to see the
+  // report the admin publishes. This dashboard is a static file with
+  // no server of its own, so it talks to a small Google Apps Script
+  // Web App that stores the published report in Drive.
+  //
+  // Setup (one time):
+  //   1. Deploy the companion "Code.gs" (provided separately) as a
+  //      Google Apps Script Web App, access: "Anyone".
+  //   2. Paste the deployed /exec URL below.
+  //   3. Set BACKEND_TOKEN to the same value as ADMIN_TOKEN inside Code.gs.
+  // Until BACKEND_URL is filled in, publish/clear/auto-load are skipped
+  // and the dashboard behaves as a local-only tool.
+  // ---------------------------------------------------------------
+  const BACKEND_URL = "https://script.google.com/macros/s/AKfycbyvy3XGG2aJZsPiPlOb3bebv22OU-G_S0YHBFldA1PXa0eauX6bXTD7vM2US9LkGA/exec";
+  const BACKEND_TOKEN = "Sunthar12@";
+
+  function backendConfigured(){
+    return BACKEND_URL && BACKEND_URL.indexOf('PASTE_YOUR') === -1;
+  }
+
+  const TABLE_PAGE_SIZE = 100;
+  const MAX_DISTINCT_FOR_CHART = 8;
+  const HUB_COL = "hub";
+  const RIDER_COL = "rider_name";
+  const DATE_COL = "Runsheet Date";
+  const DSR_COL = "DSR";
+  const CLOSURE_COL = "status_at_closure";
+  const TREND_TIME_COL = "Update Time";
+  const AWB_COL = "awb_number";
+
+  // Columns used by the Fake Runsheet tab. These weren't referenced elsewhere in the
+  // dashboard, so these are best-guess header names — rename here if your CSV differs.
+  const RUNSHEET_ID_COL = "runsheet_id";
+  const TYPE_COL = "type";
+  const RIDER_ID_COL = "Rider ID";
+
+  const KNOWN_CLOSURE_ORDER = [
+    "DELIVERED","NOT_CONTACTABLE","ON_HOLD","Received at hub","nc","0",
+    "cancelled_by_customer","RTS","CID","IN_RETURN_PROCESS","NOT_ATTEMPTED",
+    "na","qc_failed","NDR_DEL","(blank)"
+  ];
+
+  let liveData = null;          // the currently rendered / published dataset
+  let stagedSources = {};       // { sourceName: { rows:[...], columns:[...] } } — admin's working set, pre-publish
+  let charts = {};
+  let currentSearch = '';
+  let currentPage = 1;
+  let filteredRowsCache = null;     // raw-data tab cache (global filters + search + sort)
+  let globalFilteredCache = null;   // global-filter-only cache
+
+  // filters[col] = Set of selected string values.
+  // A column key is only present in `filters` when it represents an ACTIVE restriction
+  // (a Set with 1..N-1 of the distinct values, or even an empty Set meaning "match nothing").
+  // "All values selected" is represented by simply deleting the key (no restriction).
+  let filters = {};
+  let activeFilterCol = null;
+  let popoverPendingSelection = null;
+  let popoverSearchDebounce = null;
+
+  let sortState = {
+    hubsummary: { key: 'hub', dir: 'asc' },
+    hubclosure: { key: 'hub', dir: 'asc' },
+    ridersummary: { key: 'hub', dir: 'asc' },
+    riderclosure: { key: 'hub', dir: 'asc' },
+    fakerunsheet: { key: 'hub', dir: 'asc' },
+    rawdata: { key: null, dir: 'asc' }
+  };
+
+  let hubSummaryData = [];
+  let riderSummaryData = [];
+  let hubClosureData = { rows: [], statuses: [] };
+  let riderClosureData = { rows: [], statuses: [] };
+  let fakeRunsheetData = [];
+  let fakeRunsheetFilterValue = 'all';
+
+  function safeBind(id, event, callback) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(event, callback);
+  }
+
+  function isDateLikeKey(key){
+    const lc = String(key).toLowerCase();
+    return lc.includes('date') || lc.includes('time');
+  }
+
+  function parseFlexibleDate(s){
+    if(s===undefined||s===null||s==='') return NaN;
+    s = String(s).trim();
+    let m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+    if(m){
+      const d = parseInt(m[1],10), mo = parseInt(m[2],10)-1, y = parseInt(m[3],10);
+      return new Date(y, mo, d).getTime();
+    }
+    m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if(m){
+      const y = parseInt(m[1],10), mo = parseInt(m[2],10)-1, d = parseInt(m[3],10);
+      return new Date(y, mo, d).getTime();
+    }
+    const t = Date.parse(s);
+    return isNaN(t) ? NaN : t;
+  }
+
+  function compareValues(av, bv, dateLike){
+    const aEmpty = av===undefined||av===null||av==='';
+    const bEmpty = bv===undefined||bv===null||bv==='';
+    if(aEmpty && bEmpty) return 0;
+    if(aEmpty) return 1;
+    if(bEmpty) return -1;
+    if(dateLike){
+      const ad = parseFlexibleDate(av), bd = parseFlexibleDate(bv);
+      if(!isNaN(ad) && !isNaN(bd)) return ad - bd;
+    }
+    const an = Number(av), bn = Number(bv);
+    if(av!=='' && bv!=='' && !isNaN(an) && !isNaN(bn)){
+      return an - bn;
+    }
+    return String(av).localeCompare(String(bv), undefined, {numeric:true, sensitivity:'base'});
+  }
+
+  function initUIHandlers() {
+    safeBind('unlockBtn', 'click', () => {
+      const adminPass = document.getElementById('adminPass');
+      if(adminPass && adminPass.value === ADMIN_CODE){
+        document.getElementById('adminPanel')?.classList.remove('hidden');
+        document.getElementById('gateRow')?.classList.add('hidden');
+        document.getElementById('lockBtn')?.classList.remove('hidden');
+      } else if(adminPass) {
+        adminPass.style.borderColor = 'var(--bad)';
+        setTimeout(()=>adminPass.style.borderColor='', 900);
+      }
+    });
+
+    safeBind('adminPass', 'keydown', e => { if(e.key==='Enter') document.getElementById('unlockBtn')?.click(); });
+
+    safeBind('lockBtn', 'click', () => {
+      document.getElementById('adminPanel')?.classList.add('hidden');
+      document.getElementById('gateRow')?.classList.remove('hidden');
+      document.getElementById('lockBtn')?.classList.add('hidden');
+      const adminPass = document.getElementById('adminPass');
+      if(adminPass) adminPass.value='';
+    });
+
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    if(dropzone && fileInput) {
+      dropzone.onclick = () => fileInput.click();
+      ['dragover','dragenter'].forEach(ev => dropzone.addEventListener(ev, e=>{e.preventDefault(); dropzone.classList.add('drag');}));
+      ['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e=>{e.preventDefault(); dropzone.classList.remove('drag');}));
+      dropzone.addEventListener('drop', e=>{ e.preventDefault(); if(e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
+      fileInput.addEventListener('change', e=>{ if(e.target.files.length){ handleFiles(e.target.files); fileInput.value=''; } });
+    }
+
+    const jsonDropzone = document.getElementById('jsonDropzone');
+    const jsonFileInput = document.getElementById('jsonFileInput');
+    if(jsonDropzone && jsonFileInput) {
+      jsonDropzone.onclick = () => jsonFileInput.click();
+      ['dragover','dragenter'].forEach(ev => jsonDropzone.addEventListener(ev, e=>{e.preventDefault(); jsonDropzone.classList.add('drag');}));
+      ['dragleave','drop'].forEach(ev => jsonDropzone.addEventListener(ev, e=>{e.preventDefault(); jsonDropzone.classList.remove('drag');}));
+      jsonDropzone.addEventListener('drop', e=>{ e.preventDefault(); if(e.dataTransfer.files.length) handleJsonFile(e.dataTransfer.files[0]); });
+      jsonFileInput.addEventListener('change', e=>{ if(e.target.files.length){ handleJsonFile(e.target.files[0]); jsonFileInput.value=''; } });
+    }
+
+    safeBind('exportLiveBtn', 'click', () => {
+      if(!liveData) return;
+      const rows = getRawDataRows();
+      const cols = ['__sheet', ...liveData.columns];
+      downloadCSV(rows, cols, "raw_data_export");
+    });
+
+    safeBind('exportHubSummaryBtn', 'click', () => {
+      downloadCSV(hubSummaryData.map(o=>summaryRowToExport(o, HUB_SUMMARY_IDCOLS)), summaryExportCols(HUB_SUMMARY_IDCOLS), "hub_wise_summary");
+    });
+    safeBind('exportRiderSummaryBtn', 'click', () => {
+      downloadCSV(riderSummaryData.map(o=>summaryRowToExport(o, RIDER_SUMMARY_IDCOLS)), summaryExportCols(RIDER_SUMMARY_IDCOLS), "rider_wise_summary");
+    });
+    safeBind('exportHubClosureBtn', 'click', () => {
+      downloadCSV(closureRowsToExport(hubClosureData, HUB_CLOSURE_IDCOLS), closureExportCols(hubClosureData, HUB_CLOSURE_IDCOLS), "hub_wise_status_closure");
+    });
+    safeBind('exportRiderClosureBtn', 'click', () => {
+      downloadCSV(closureRowsToExport(riderClosureData, RIDER_CLOSURE_IDCOLS), closureExportCols(riderClosureData, RIDER_CLOSURE_IDCOLS), "rider_wise_status_closure");
+    });
+    safeBind('exportFakeRunsheetBtn', 'click', () => {
+      downloadCSV(getFilteredFakeRunsheetData().map(fakeRunsheetRowToExport), fakeRunsheetExportCols(), "fake_runsheet_report");
+    });
+    safeBind('fakeRunsheetFilter', 'change', (e) => {
+      fakeRunsheetFilterValue = e.target.value;
+      renderFakeRunsheetTable();
+    });
+
+    safeBind('resetFiltersBtn', 'click', () => { filters = {}; onFiltersChanged(); });
+
+    safeBind('publishBtn', 'click', () => { publishReport(); });
+    safeBind('clearAllBtn', 'click', () => { clearAllReports(); });
+
+    safeBind('downloadMasterJsonBtn', 'click', () => {
+      if(!liveData) return;
+      const btn = document.getElementById('downloadMasterJsonBtn');
+      const originalLabel = btn ? btn.textContent : '';
+      if(btn){ btn.disabled = true; btn.textContent = 'Building file…'; }
+      // Defer one tick so the button label updates before the heavy synchronous work starts.
+      setTimeout(()=>{
+        try {
+          downloadJSONStreamChunked(liveData, `dashboard_master_${new Date().toISOString().slice(0,10)}`);
+        } catch(err) {
+          console.error(err);
+          showError("Could not build the master JSON — the merged dataset is likely too large for your browser tab to hold a second copy in memory. Try applying filters first, or use the Raw Data tab's CSV export instead.");
+        } finally {
+          if(btn){ btn.disabled = false; btn.textContent = originalLabel; }
+        }
+      }, 30);
+    });
+
+    document.querySelectorAll('.tab-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-'+btn.dataset.tab)?.classList.add('active');
+      });
+    });
+
+    document.addEventListener('scroll', repositionPopoverIfOpen, true);
+    window.addEventListener('resize', repositionPopoverIfOpen);
+    document.addEventListener('mousedown', handleOutsideClick);
+  }
+
+  function flattenStagedSources(){
+    const names = Object.keys(stagedSources);
+    let rows = [];
+    let columnSet = [];
+    let sheetCounts = {};
+    let totalSize = 0;
+    names.forEach(name=>{
+      const src = stagedSources[name];
+      sheetCounts[name] = src.rows.length;
+      totalSize += src.fileSize || 0;
+      (src.columns||[]).forEach(c=>{ if(c !== '__sheet' && columnSet.indexOf(c) === -1) columnSet.push(c); });
+      rows = rows.concat(src.rows);
+    });
+    return {
+      rows, columns: columnSet, sheetCounts,
+      fileName: `${names.length} sheet(s) merged`,
+      fileSize: totalSize,
+      savedAt: new Date().toISOString()
+    };
+  }
+
+  function setStagedFromFlat(flat){
+    stagedSources = {};
+    const byName = {};
+    const cols = flat.columns ? flat.columns.slice() : [];
+    (flat.rows || []).forEach(r=>{
+      const name = r.__sheet || 'Unnamed Sheet';
+      if(!byName[name]) byName[name] = [];
+      byName[name].push(r);
+    });
+    Object.keys(byName).forEach(name=>{
+      stagedSources[name] = { rows: byName[name], columns: cols, fileSize: 0 };
+    });
+  }
+
+  function renderSourcesPanel(){
+    const wrap = document.getElementById('sourcesPanel');
+    const hint = document.getElementById('sourcesEmptyHint');
+    if(!wrap) return;
+    const names = Object.keys(stagedSources);
+    if(hint) hint.textContent = names.length ? names.length + ' sheet(s) staged' : 'No sheets loaded yet — drop CSV files above.';
+    wrap.innerHTML = names.map(name=>{
+      const count = stagedSources[name].rows.length;
+      return `<div class="source-chip" data-name="${escapeHtml(name)}">
+        <span class="sc-name">${escapeHtml(name)}</span>
+        <span class="sc-count">${count.toLocaleString()} rows</span>
+        <button class="sc-remove" data-name="${escapeHtml(name)}" title="Remove this sheet from the working set">×</button>
+      </div>`;
+    }).join('') || '<span style="font-size:12.5px;color:var(--muted);">No sheets loaded yet.</span>';
+
+    wrap.querySelectorAll('.sc-remove').forEach(btn=>{
+      btn.addEventListener('click', ()=> removeSource(btn.dataset.name));
+    });
+  }
+
+  function removeSource(name){
+    delete stagedSources[name];
+    renderSourcesPanel();
+    previewStaged();
+  }
+
+  function previewStaged(){
+    const flat = flattenStagedSources();
+    if(flat.rows.length === 0){
+      liveData = null;
+      document.getElementById('mergeSummary')?.classList.add('hidden');
+      showEmptyState('No working sheets', 'Drop CSV files above to start building a report, or publish nothing to clear the team\'s view too.');
+      return;
+    }
+    liveData = flat;
+    currentPage = 1;
+    filters = {};
+    initDataDependentState();
+    renderDashboard();
+    updateStatus();
+    renderMergeSummary();
+  }
+
+  function showEmptyState(title, bodyHtml){
+    document.getElementById('dashboardArea')?.classList.add('hidden');
+    document.getElementById('emptyState')?.classList.remove('hidden');
+    const t = document.getElementById('emptyStateTitle');
+    const b = document.getElementById('emptyStateBody');
+    if(t && title) t.textContent = title;
+    if(b && bodyHtml) b.innerHTML = bodyHtml;
+  }
+
+  function setSyncStatus(text){
+    const el = document.getElementById('syncStatusLine');
+    if(el) el.textContent = text;
+  }
+
+  function summaryExportCols(idCols){
+    return [...idCols.map(c=>c.label), 'Date', 'OFD', 'Delivered', 'DSR %', 'OFP', 'Picked', 'PSR %'];
+  }
+  function summaryRowToExport(o, idCols){
+    const out = {};
+    idCols.forEach(c => out[c.label] = o[c.key]);
+    out['Date'] = o.date; out['OFD'] = o.ofd; out['Delivered'] = o.delivered;
+    out['DSR %'] = o.dsrPct.toFixed(2); out['OFP'] = o.ofp; out['Picked'] = o.picked; out['PSR %'] = o.psrPct.toFixed(2);
+    return out;
+  }
+  function closureExportCols(dataset, idCols){
+    return [...idCols.map(c=>c.label), 'Date', 'Total', ...dataset.statuses];
+  }
+  function closureRowsToExport(dataset, idCols){
+    return dataset.rows.map(r=>{
+      const o = {};
+      idCols.forEach(c => o[c.label] = r[c.key]);
+      o['Date'] = r.date; o['Total'] = r.total;
+      dataset.statuses.forEach(s => o[s] = r[s] || 0);
+      return o;
+    });
+  }
+
+  function fakeRunsheetExportCols(){
+    return ['Hub Name','Runsheet Date','Runsheet ID','Rider Name','Type','Order','Sucess','DSR %','Fake Runsheet'];
+  }
+  function fakeRunsheetRowToExport(o){
+    return {
+      'Hub Name': o.hub, 'Runsheet Date': o.date, 'Runsheet ID': o.runsheetId,
+      'Rider Name': o.riderName, 'Type': o.type,
+      'Order': o.orders, 'Sucess': o.success, 'DSR %': o.dsrPct.toFixed(2), 'Fake Runsheet': o.fake
+    };
+  }
+
+  // Parses CSVs into stagedSources (replacing any existing sheet of the same name).
+  // Does NOT publish — admin reviews the local preview, then clicks "Publish Report to Team".
+  async function handleFiles(files){
+    clearError();
+    setStatusBusy(true);
+    let anyLoaded = false;
+
+    for (let f = 0; f < files.length; f++) {
+      const file = files[f];
+      if (!file.name.toLowerCase().endsWith('.csv')) { showError(`File "${file.name}" is not a valid CSV layout.`); setStatusBusy(false); return; }
+
+      const sourceName = file.name.replace(/\.csv$/i, '');
+      showProgress(`Parsing sheet ${f + 1} of ${files.length}...`, `Reading ${file.name}`);
+
+      let rows = [];
+      let columnSet = [];
+      await new Promise((resolve, reject) => {
+        Papa.parse(file, {
+          header: true, skipEmptyLines: true, worker: true,
+          chunk: function(results) {
+            if (columnSet.length === 0 && results.meta && results.meta.fields) columnSet = results.meta.fields;
+            for (let i = 0; i < results.data.length; i++) {
+                results.data[i].__sheet = sourceName;
+                rows.push(results.data[i]);
+            }
+            document.getElementById('progressDetail').textContent = `Reading ${file.name}: ${rows.length.toLocaleString()} rows so far...`;
+          },
+          complete: resolve, error: reject
+        });
+      });
+
+      if (rows.length === 0) { showError(`File "${file.name}" produced no usable rows — it was skipped.`); continue; }
+      stagedSources[sourceName] = { rows, columns: columnSet, fileSize: file.size };
+      anyLoaded = true;
+    }
+
+    document.getElementById('progressWrap')?.classList.add('hidden');
+    setStatusBusy(false);
+    if(!anyLoaded) return;
+
+    try {
+      // Give the browser a breath before the aggregation passes below.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      renderSourcesPanel();
+      previewStaged();
+    } catch (err) {
+      console.error(err);
+      showError("A runtime limitation occurred while preparing the working sheets. If this dataset is very large, try loading fewer CSV files at a time.");
+    }
+  }
+
+  // Loads a previously downloaded master JSON backup into the working set (replaces staged
+  // sheets entirely, mirroring whatever was saved). Does not publish by itself.
+  function handleJsonFile(file) {
+    if (!file || !file.name.toLowerCase().endsWith('.json')) { showError("Please drop a valid system configuration file state."); return; }
+    clearError();
+    setStatusBusy(true);
+    showProgress("Opening configuration file payload matrix...", file.name);
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        if (!parsed.rows || !parsed.columns) throw new Error("Missing structural properties required to render dashboards.");
+        setStagedFromFlat(parsed);
+        document.getElementById('progressWrap')?.classList.add('hidden');
+        setStatusBusy(false);
+        renderSourcesPanel();
+        previewStaged();
+      } catch(err) {
+        showError("Invalid JSON configuration layout: " + err.message);
+        setStatusBusy(false);
+      }
+    };
+    reader.onerror = () => { showError("Failed to read selected local system file context."); setStatusBusy(false); };
+    reader.readAsText(file);
+  }
+
+  // ---------------------------------------------------------------
+  // Shared backend sync (publish / clear / auto-load on startup)
+  // ---------------------------------------------------------------
+  async function publishReport(){
+    if(Object.keys(stagedSources).length === 0){
+      showError("No working sheets to publish — drop at least one CSV above first.");
+      return;
+    }
+    previewStaged(); // ensures liveData reflects exactly what's about to be published
+
+    const btn = document.getElementById('publishBtn');
+    const originalLabel = btn ? btn.textContent : '';
+
+    if(!backendConfigured()){
+      showError('The shared backend isn\'t configured yet (BACKEND_URL is still the placeholder), so this report is only visible in your own browser right now. See the setup notes near the top of the script, or ask whoever set this page up to finish that one-time step.');
+      return;
+    }
+
+    if(btn){ btn.disabled = true; btn.textContent = 'Publishing…'; }
+    try{
+      const resp = await fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // text/plain avoids a CORS preflight against Apps Script
+        body: JSON.stringify({ token: BACKEND_TOKEN, action: 'save', data: liveData })
+      });
+      const result = await resp.json().catch(()=>({}));
+      if(result && result.success){
+        setSyncStatus('✓ Published to your team at ' + new Date().toLocaleTimeString() + '.');
+      } else {
+        throw new Error((result && result.error) || 'Unexpected response from backend');
+      }
+    } catch(err){
+      console.error(err);
+      showError('Could not publish to the shared backend: ' + err.message + '. Double-check BACKEND_URL / BACKEND_TOKEN at the top of the script, and that the Apps Script is deployed with access set to "Anyone".');
+    } finally {
+      if(btn){ btn.disabled = false; btn.textContent = originalLabel; }
+    }
+  }
+
+  async function clearAllReports(){
+    if(!confirm('This clears the published report for your whole team and resets your working sheets here. Continue?')) return;
+
+    stagedSources = {};
+    liveData = null;
+    filters = {};
+    renderSourcesPanel();
+    document.getElementById('mergeSummary')?.classList.add('hidden');
+    showEmptyState('No active report', 'All working sheets and the published report have been cleared.');
+
+    if(!backendConfigured()){
+      setSyncStatus('Local data cleared. (Shared backend not configured.)');
+      return;
+    }
+    try{
+      const resp = await fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ token: BACKEND_TOKEN, action: 'clear' })
+      });
+      const result = await resp.json().catch(()=>({}));
+      if(result && result.success){ setSyncStatus('✓ Cleared for your whole team.'); }
+      else throw new Error((result && result.error) || 'Unexpected response from backend');
+    } catch(err){
+      console.error(err);
+      showError('Cleared locally, but could not clear the shared backend: ' + err.message);
+    }
+  }
+
+  async function loadPublishedReportOnStartup(){
+    if(!backendConfigured()){
+      setSyncStatus('Shared backend not configured — running in local-only mode.');
+      showEmptyState('No active report', 'Shared publishing isn\'t configured yet for this page. Admins: see the setup notes near the top of the dashboard\'s script, or unlock the admin panel above to work locally.');
+      return;
+    }
+    setSyncStatus('Checking for a published report…');
+    try{
+      const sep = BACKEND_URL.indexOf('?') >= 0 ? '&' : '?';
+      const resp = await fetch(BACKEND_URL + sep + 'action=load', { method:'GET' });
+      const result = await resp.json();
+
+      if(!result || result.exists === false || !result.rows){
+        setSyncStatus('No report has been published yet.');
+        showEmptyState('No active report yet', 'Your admin hasn\'t published a report. Once they do, it will appear here automatically — just refresh this page.or Contact Admin Sunthara Mahalingam 9500400427');
+        return;
+      }
+
+      liveData = result;
+      setStagedFromFlat(result);
+      currentPage = 1;
+      filters = {};
+      initDataDependentState();
+      renderDashboard();
+      updateStatus();
+      renderSourcesPanel();
+      setSyncStatus('✓ Showing the report published by your admin' + (result.savedAt ? (' (' + new Date(result.savedAt).toLocaleString() + ')') : '') + '.');
+    } catch(err){
+      console.error(err);
+      setSyncStatus('Could not reach the shared backend.');
+      showEmptyState('No active report', 'Could not reach the shared report backend just now. If you are the admin, double-check BACKEND_URL. Otherwise, please refresh in a moment.');
+    }
+  }
+
+  function showProgress(stage, detail){
+    const wrap = document.getElementById('progressWrap');
+    if(!wrap) return;
+    wrap.classList.remove('hidden');
+    const lbl = document.getElementById('progressStageLabel');
+    const dtl = document.getElementById('progressDetail');
+    if(lbl) lbl.textContent = stage;
+    if(dtl && detail) dtl.textContent = detail;
+  }
+
+  function showError(msg){
+    const box = document.getElementById('errorBox');
+    const dtl = document.getElementById('errorDetail');
+    if(box) box.classList.add('show');
+    if(dtl) dtl.textContent = msg;
+    document.getElementById('progressWrap')?.classList.add('hidden');
+    setStatusBusy(false);
+  }
+  function clearError(){ document.getElementById('errorBox')?.classList.remove('show'); }
+
+  function setStatusBusy(busy){
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if(!dot || !text) return;
+    if(busy){ dot.className = 'dot busy'; text.textContent = 'Processing files…'; }
+    else { updateStatus(); }
+  }
+
+  function formatBytes(b){
+    if(b < 1024) return b + ' B';
+    if(b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    if(b < 1024*1024*1024) return (b/(1024*1024)).toFixed(1) + ' MB';
+    return (b/(1024*1024*1024)).toFixed(2) + ' GB';
+  }
+
+  function renderMergeSummary(){
+    const grid = document.getElementById('mergeGrid');
+    if(!grid) return;
+    const sheetNames = Object.keys(liveData.sheetCounts);
+    grid.innerHTML = `
+      <div class="merge-card"><div class="n">${sheetNames.length}</div><div class="l">Tracked Sources</div></div>
+      <div class="merge-card"><div class="n">${liveData.rows.length.toLocaleString()}</div><div class="l">Total rows</div></div>
+      <div class="merge-card"><div class="n">${liveData.columns.length}</div><div class="l">Data Fields</div></div>
+      <div class="merge-card"><div class="n">${formatBytes(liveData.fileSize || 5000000)}</div><div class="l">Calculated Size</div></div>
+    `;
+    document.getElementById('mergeSummary')?.classList.remove('hidden');
+  }
+
+  function updateStatus(){
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    const asOf = document.getElementById('dataAsOf');
+    if(!dot || !text || !asOf) return;
+    if(liveData){
+      dot.className = 'dot live';
+      text.textContent = liveData.rows.length.toLocaleString() + ' records active';
+      asOf.textContent = 'Active state generated at: ' + new Date(liveData.savedAt).toLocaleTimeString();
+    } else {
+      dot.className = 'dot empty';
+      text.textContent = 'Inactive';
+      asOf.textContent = 'No configuration loaded';
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Filters (cascading)
+  // ---------------------------------------------------------------
+  function getFilterableColumns(){
+    return ['__sheet', ...liveData.columns].filter(c => c !== AWB_COL);
+  }
+
+  function initDataDependentState(){
+    renderFilterChips();
+  }
+
+  function renderFilterChips(){
+    const wrap = document.getElementById('filterChips');
+    if(!wrap) return;
+    const cols = getFilterableColumns();
+    wrap.innerHTML = cols.map(col=>{
+      const label = col === '__sheet' ? 'Source File' : col;
+      const sel = filters[col];
+      const isActive = sel !== undefined;
+      const countLabel = isActive ? `<span class="fc-count">${sel.size}</span>` : '<span class="fc-count" style="background:var(--muted);">All</span>';
+      const openCls = activeFilterCol === col ? 'open' : '';
+      return `<button class="filter-chip ${isActive?'active':''} ${openCls}" data-col="${escapeHtml(col)}">
+        ${escapeHtml(label)} ${countLabel} <span class="fc-arrow">▾</span>
+      </button>`;
+    }).join('');
+
+    wrap.querySelectorAll('.filter-chip').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const col = btn.dataset.col;
+        const pop = document.getElementById('filterPopover');
+        if(activeFilterCol === col && pop && !pop.classList.contains('hidden')){
+          closeFilterPopover();
+        } else {
+          openFilterPopover(col, btn);
+        }
+      });
+    });
+  }
+
+  // rows filtered by every active filter EXCEPT the given column (used to build that column's options)
+  function getRowsExcludingFilter(excludeCol){
+    const cols = Object.keys(filters).filter(c => c !== excludeCol);
+    if(cols.length === 0) return liveData.rows;
+    return liveData.rows.filter(r=>{
+      for(let i=0;i<cols.length;i++){
+        const col = cols[i];
+        const v = r[col];
+        const sv = v===undefined||v===null||v==='' ? '' : String(v);
+        if(!filters[col].has(sv)) return false;
+      }
+      return true;
+    });
+  }
+
+  function getDistinctForColumn(col){
+    const rows = getRowsExcludingFilter(col);
+    const set = new Set();
+    rows.forEach(r=>{
+      const v = r[col];
+      set.add(v===undefined||v===null||v==='' ? '' : String(v));
+    });
+    return Array.from(set).sort((a,b)=> a.localeCompare(b, undefined, {numeric:true}));
+  }
+
+  function ensurePopoverEl(){
+    let pop = document.getElementById('filterPopover');
+    if(pop) return pop;
+    pop = document.createElement('div');
+    pop.id = 'filterPopover';
+    pop.className = 'filter-popover hidden';
+    pop.innerHTML = `
+      <div class="filter-popover-head">
+        <input class="search-input" id="filterPopoverSearch" placeholder="Search values…">
+        <div class="filter-popover-actions">
+          <button id="fpSelectAll" type="button">Select all</button>
+          <span class="filter-popover-note" id="fpNote"></span>
+          <button id="fpClear" type="button">Clear all</button>
+        </div>
+      </div>
+      <div class="filter-popover-list" id="filterPopoverList"></div>
+      <div class="filter-popover-foot">
+        <button class="btn btn-line" id="fpClose" type="button">Cancel</button>
+        <button class="btn btn-signal" id="fpApply" type="button">Apply</button>
+      </div>
+    `;
+    document.body.appendChild(pop);
+    pop.addEventListener('mousedown', e=> e.stopPropagation());
+
+    safeBind('fpSelectAll', 'click', ()=>{
+      (popoverPendingSelection.__allValues||[]).forEach(v=> popoverPendingSelection.add(v));
+      renderPopoverList(document.getElementById('filterPopoverSearch').value);
+    });
+    safeBind('fpClear', 'click', ()=>{
+      popoverPendingSelection.clear();
+      renderPopoverList(document.getElementById('filterPopoverSearch').value);
+    });
+    safeBind('fpClose', 'click', closeFilterPopover);
+    safeBind('fpApply', 'click', ()=>{
+      const values = popoverPendingSelection.__allValues || [];
+      if(popoverPendingSelection.size === values.length){
+        delete filters[activeFilterCol]; // every option selected => no restriction
+      } else {
+        filters[activeFilterCol] = new Set(popoverPendingSelection); // partial (or zero) selection => active restriction
+      }
+      closeFilterPopover();
+      onFiltersChanged();
+    });
+    safeBind('filterPopoverSearch', 'input', (e)=>{
+      clearTimeout(popoverSearchDebounce);
+      const val = e.target.value;
+      popoverSearchDebounce = setTimeout(()=> renderPopoverList(val), 150);
+    });
+
+    return pop;
+  }
+
+  function openFilterPopover(col, anchorBtn){
+    activeFilterCol = col;
+    const pop = ensurePopoverEl();
+    const allValues = getDistinctForColumn(col);
+    const existing = filters[col];
+    popoverPendingSelection = existing !== undefined ? new Set(existing) : new Set(allValues);
+    popoverPendingSelection.__allValues = allValues;
+
+    document.getElementById('filterPopoverSearch').value = '';
+    renderPopoverList('');
+    pop.classList.remove('hidden');
+    positionPopover(anchorBtn);
+    renderFilterChips();
+  }
+
+  function positionPopover(anchorBtn){
+    const pop = document.getElementById('filterPopover');
+    if(!pop || !anchorBtn) return;
+    const r = anchorBtn.getBoundingClientRect();
+    let top = r.bottom + 6;
+    let left = r.left;
+    const maxLeft = window.innerWidth - 290;
+    if(left > maxLeft) left = Math.max(10, maxLeft);
+    if(top + 380 > window.innerHeight) top = Math.max(10, r.top - 386);
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
+    pop._anchor = anchorBtn;
+  }
+
+  function repositionPopoverIfOpen(){
+    const pop = document.getElementById('filterPopover');
+    if(pop && !pop.classList.contains('hidden') && pop._anchor) positionPopover(pop._anchor);
+  }
+
+  function closeFilterPopover(){
+    const pop = document.getElementById('filterPopover');
+    if(pop) pop.classList.add('hidden');
+    const wasOpenCol = activeFilterCol;
+    activeFilterCol = null;
+    popoverPendingSelection = null;
+    if(wasOpenCol) renderFilterChips();
+  }
+
+  function handleOutsideClick(e){
+    const pop = document.getElementById('filterPopover');
+    if(!pop || pop.classList.contains('hidden')) return;
+    if(pop.contains(e.target)) return;
+    if(e.target.closest && e.target.closest('.filter-chip')) return; // let the chip's own handler decide
+    closeFilterPopover();
+  }
+
+  function renderPopoverList(searchTerm){
+    const list = document.getElementById('filterPopoverList');
+    const note = document.getElementById('fpNote');
+    if(!list || !activeFilterCol) return;
+    const term = (searchTerm||'').toLowerCase();
+    const allValues = popoverPendingSelection.__allValues || [];
+    const values = allValues.filter(v=> v.toLowerCase().includes(term));
+    if(note) note.textContent = `${popoverPendingSelection.size}/${allValues.length} selected`;
+
+    list.innerHTML = values.map((v,i)=>{
+      const display = v === '' ? '(blank)' : escapeHtml(v);
+      const checked = popoverPendingSelection.has(v) ? 'checked' : '';
+      return `<div class="fp-item">
+        <input type="checkbox" id="fpv_${i}" data-val="${escapeHtml(v)}" ${checked}>
+        <label for="fpv_${i}">${display}</label>
+      </div>`;
+    }).join('') || '<div style="padding:14px;color:var(--muted);font-size:12.5px;">No matching values</div>';
+
+    list.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const v = cb.dataset.val;
+        if(cb.checked) popoverPendingSelection.add(v); else popoverPendingSelection.delete(v);
+        if(note) note.textContent = `${popoverPendingSelection.size}/${allValues.length} selected`;
+      });
+    });
+  }
+
+  function onFiltersChanged(){
+    globalFilteredCache = null;
+    filteredRowsCache = null;
+    currentPage = 1;
+    renderFilterChips();
+    refreshAllTabs();
+  }
+
+  function getGlobalFilteredRows(){
+    if(globalFilteredCache) return globalFilteredCache;
+    const cols = Object.keys(filters);
+    if(cols.length === 0){ globalFilteredCache = liveData.rows; return globalFilteredCache; }
+    globalFilteredCache = liveData.rows.filter(r=>{
+      for(let i=0;i<cols.length;i++){
+        const col = cols[i];
+        const v = r[col];
+        const sv = v===undefined||v===null||v==='' ? '' : String(v);
+        if(!filters[col].has(sv)) return false;
+      }
+      return true;
+    });
+    return globalFilteredCache;
+  }
+
+  // ---------------------------------------------------------------
+  // Dashboard render orchestration
+  // ---------------------------------------------------------------
+  function renderDashboard(){
+    const emptyState = document.getElementById('emptyState');
+    const dashArea = document.getElementById('dashboardArea');
+    if(!emptyState || !dashArea) return;
+    emptyState.classList.add('hidden');
+    dashArea.classList.remove('hidden');
+
+    document.getElementById('mainHead').innerHTML = '<th class="no-sort">Source</th>' +
+      liveData.columns.map(c=>`<th data-key="${escapeHtml(c)}" data-tab="rawdata"><span class="th-inner">${escapeHtml(c)}<span class="sort-arrow">⇅</span></span></th>`).join('');
+    attachSortHandlers(document.getElementById('mainHead'), 'rawdata');
+
+    const searchBox = document.getElementById('searchBox');
+    let debounceTimer;
+    if(searchBox){
+      searchBox.oninput = ()=>{
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(()=>{
+          currentSearch = searchBox.value.toLowerCase();
+          currentPage = 1;
+          filteredRowsCache = null;
+          renderRawDataTable();
+        }, 250);
+      };
+    }
+    safeBind('prevPage', 'click', ()=>{ if(currentPage>1){currentPage--; renderRawDataTable();} });
+    safeBind('nextPage', 'click', ()=>{
+      const totalPages = Math.max(1, Math.ceil(getRawDataRows().length / TABLE_PAGE_SIZE));
+      if(currentPage<totalPages){currentPage++; renderRawDataTable();}
+    });
+
+    refreshAllTabs();
+  }
+
+  function refreshAllTabs(){
+    if(!liveData) return;
+    const rows = getGlobalFilteredRows();
+    renderKPIs(rows);
+    renderCharts(rows);
+    computeAndRenderSummary('hub', HUB_SUMMARY_IDCOLS, rows);
+    computeAndRenderSummary('rider', RIDER_SUMMARY_IDCOLS, rows);
+    computeAndRenderClosure('hub', HUB_CLOSURE_IDCOLS, rows);
+    computeAndRenderClosure('rider', RIDER_CLOSURE_IDCOLS, rows);
+    computeAndRenderFakeRunsheet(rows);
+    renderTrendChart(rows);
+    renderRawDataTable();
+    updateStatus();
+  }
+
+  function renderKPIs(rows){
+    const row = document.getElementById('kpiRow');
+    if(!row) return;
+    const sheetCounts = {};
+    rows.forEach(r=> sheetCounts[r.__sheet] = (sheetCounts[r.__sheet]||0)+1);
+    const sheetNames = Object.keys(sheetCounts);
+    row.innerHTML = `
+      <div class="kpi"><div class="kpi-label">Total Volume Records (Filtered)</div><div class="kpi-value">${rows.length.toLocaleString()}</div><div class="kpi-foot">of ${liveData.rows.length.toLocaleString()} total rows</div></div>
+      <div class="kpi"><div class="kpi-label">Sources In View</div><div class="kpi-value">${sheetNames.length}</div><div class="kpi-foot">Merged partitions</div></div>
+      <div class="kpi"><div class="kpi-label">Active Columns</div><div class="kpi-value">${liveData.columns.length}</div><div class="kpi-foot">Structural attributes</div></div>
+      <div class="kpi"><div class="kpi-label">Auto-Save Status</div><div class="kpi-value" style="font-size:21px; color:var(--good); margin-top:12px;">Saved Stream</div><div class="kpi-foot">JSON Downloaded</div></div>
+    `;
+  }
+
+  function renderCharts(rows){
+    if(!document.getElementById('chart1') || !document.getElementById('chart2')) return;
+    const sheetCounts = {};
+    rows.forEach(r=> sheetCounts[r.__sheet] = (sheetCounts[r.__sheet]||0)+1);
+    const sheetNames = Object.keys(sheetCounts);
+    const palette = ['#101a2b','#2f6fed','#b45309','#15803d','#64748b','#b91c1c','#1d2e47','#6f9bf2'];
+
+    if(charts.c1) charts.c1.destroy();
+    charts.c1 = new Chart(document.getElementById('chart1').getContext('2d'), {
+      type:'bar',
+      data:{ labels: sheetNames, datasets:[{ label:'Rows', data: sheetNames.map(s=>sheetCounts[s]), backgroundColor: sheetNames.map((_,i)=>palette[i%palette.length]), borderRadius:5 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, grid:{color:'#e9edf3'}}, x:{grid:{display:false}}} }
+    });
+
+    const candidateCols = liveData.columns.filter(c=>{
+      const lc = c.toLowerCase();
+      return lc.includes('status') || lc.includes('hub') || lc.includes('type') || lc.includes('category');
+    });
+    let chart2Col = candidateCols[0] || liveData.columns[1] || liveData.columns[0];
+    const title2 = document.getElementById('chart2Title');
+    if(title2) title2.textContent = 'By Attribute: ' + chart2Col;
+
+    const counts = {};
+    for(let i=0; i<rows.length; i++){
+      const r = rows[i];
+      const v = (r[chart2Col]===undefined || r[chart2Col]==='') ? 'Unspecified' : String(r[chart2Col]);
+      counts[v] = (counts[v]||0)+1;
+    }
+    const sortedKeys = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,MAX_DISTINCT_FOR_CHART);
+
+    if(charts.c2) charts.c2.destroy();
+    charts.c2 = new Chart(document.getElementById('chart2').getContext('2d'), {
+      type:'doughnut',
+      data:{ labels: sortedKeys, datasets:[{ data: sortedKeys.map(k=>counts[k]), backgroundColor: sortedKeys.map((_,i)=>palette[i%palette.length]), borderWidth:2, borderColor:'#ffffff' }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right', labels:{boxWidth:12, font:{size:11}}}} }
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Summary tables (Hub Wise / Rider Wise) — generalized
+  // ---------------------------------------------------------------
+  const HUB_SUMMARY_IDCOLS = [{field:HUB_COL, key:'hub', label:'Hub Name'}];
+  const RIDER_SUMMARY_IDCOLS = [{field:HUB_COL, key:'hub', label:'Hub Name'}, {field:RIDER_COL, key:'rider', label:'Rider Name'}];
+  const HUB_CLOSURE_IDCOLS = [{field:HUB_COL, key:'hub', label:'Hub Name'}];
+  const RIDER_CLOSURE_IDCOLS = [{field:HUB_COL, key:'hub', label:'Hub Name'}, {field:RIDER_COL, key:'rider', label:'Rider Name'}];
+
+  function computeSummary(rows, idCols){
+    const map = {};
+    for(let i=0;i<rows.length;i++){
+      const r = rows[i];
+      const idVals = idCols.map(c => r[c.field]===undefined||r[c.field]===null ? '' : String(r[c.field]));
+      const date = r[DATE_COL]===undefined||r[DATE_COL]===null ? '' : String(r[DATE_COL]);
+      const key = idVals.join('\u0001') + '\u0001' + date;
+      if(!map[key]){
+        const o = { date, ofd:0, delivered:0, ofp:0, picked:0 };
+        idCols.forEach((c,idx)=> o[c.key] = idVals[idx]);
+        map[key] = o;
+      }
+      const dsr = (r[DSR_COL]||'').toString().trim().toLowerCase();
+      const o = map[key];
+      if(dsr === 'delivered'){ o.delivered++; o.ofd++; }
+      else if(dsr === 'not delivered'){ o.ofd++; }
+      else if(dsr === 'picked'){ o.picked++; o.ofp++; }
+      else if(dsr === 'not picked'){ o.ofp++; }
+    }
+    return Object.values(map).map(o=>({ ...o, dsrPct: o.ofd ? (o.delivered/o.ofd*100) : 0, psrPct: o.ofp ? (o.picked/o.ofp*100) : 0 }));
+  }
+
+  function buildSummaryColsDef(idCols){
+    return [
+      ...idCols.map(c=>({key:c.key, label:c.label, type:'text'})),
+      {key:'date', label:'Date', type:'date'},
+      {key:'ofd', label:'OFD', type:'num'},
+      {key:'delivered', label:'Delivered', type:'num'},
+      {key:'dsrPct', label:'DSR %', type:'pct'},
+      {key:'ofp', label:'OFP', type:'num'},
+      {key:'picked', label:'Picked', type:'num'},
+      {key:'psrPct', label:'PSR %', type:'pct'}
+    ];
+  }
+
+  function computeAndRenderSummary(which, idCols, rows){
+    const data = computeSummary(rows, idCols);
+    const tabKey = which === 'hub' ? 'hubsummary' : 'ridersummary';
+    sortDataset(data, sortState[tabKey]);
+    if(which === 'hub') hubSummaryData = data; else riderSummaryData = data;
+    renderSummaryTable(which, idCols);
+  }
+
+  function renderSummaryTable(which, idCols){
+    const data = which === 'hub' ? hubSummaryData : riderSummaryData;
+    const tabKey = which === 'hub' ? 'hubsummary' : 'ridersummary';
+    const headId = which === 'hub' ? 'hubSummaryHead' : 'riderSummaryHead';
+    const bodyId = which === 'hub' ? 'hubSummaryBody' : 'riderSummaryBody';
+    const countId = which === 'hub' ? 'hubSummaryRowCount' : 'riderSummaryRowCount';
+    const colsDef = buildSummaryColsDef(idCols);
+
+    const head = document.getElementById(headId);
+    if(head){
+      head.innerHTML = colsDef.map(c=>`<th data-key="${escapeHtml(c.key)}" data-tab="${tabKey}"><span class="th-inner">${escapeHtml(c.label)}<span class="sort-arrow">⇅</span></span></th>`).join('');
+      attachSortHandlers(head, tabKey, ()=> { sortDataset(data, sortState[tabKey]); renderSummaryTable(which, idCols); });
+      markSortedHeader(head, sortState[tabKey]);
+    }
+    const body = document.getElementById(bodyId);
+    if(body){
+      body.innerHTML = data.map(o=>{
+        let cells = idCols.map(c=>`<td>${escapeHtml(o[c.key] || '(blank)')}</td>`).join('');
+        cells += `<td>${escapeHtml(o.date || '(blank)')}</td>`;
+        cells += `<td class="num">${o.ofd.toLocaleString()}</td>`;
+        cells += `<td class="num">${o.delivered.toLocaleString()}</td>`;
+        cells += `<td class="num">${pctPill(o.dsrPct)}</td>`;
+        cells += `<td class="num">${o.ofp.toLocaleString()}</td>`;
+        cells += `<td class="num">${o.picked.toLocaleString()}</td>`;
+        cells += `<td class="num">${pctPill(o.psrPct)}</td>`;
+        return `<tr>${cells}</tr>`;
+      }).join('') || `<tr><td colspan="${colsDef.length}" style="text-align:center;color:var(--muted);padding:24px;">No rows match the current filters</td></tr>`;
+    }
+    const cnt = document.getElementById(countId);
+    if(cnt) cnt.textContent = data.length.toLocaleString() + ' group(s)';
+  }
+
+  function pctPill(v){
+    const cls = v >= 95 ? 'pct-good' : (v >= 80 ? 'pct-warn' : 'pct-bad');
+    return `<span class="pct-pill ${cls}">${v.toFixed(1)}%</span>`;
+  }
+
+  // ---------------------------------------------------------------
+  // Closure tables (Hub Wise / Rider Wise) — generalized
+  // ---------------------------------------------------------------
+  function computeClosure(rows, idCols){
+    const map = {};
+    const statusSet = new Set();
+    for(let i=0;i<rows.length;i++){
+      const r = rows[i];
+      const idVals = idCols.map(c => r[c.field]===undefined||r[c.field]===null ? '' : String(r[c.field]));
+      const date = r[DATE_COL]===undefined||r[DATE_COL]===null ? '' : String(r[DATE_COL]);
+      const key = idVals.join('\u0001') + '\u0001' + date;
+      let status = r[CLOSURE_COL];
+      status = status===undefined||status===null ? '' : String(status).trim();
+      if(status === '') status = '(blank)';
+      statusSet.add(status);
+      if(!map[key]){
+        const o = { date, total:0 };
+        idCols.forEach((c,idx)=> o[c.key] = idVals[idx]);
+        map[key] = o;
+      }
+      map[key][status] = (map[key][status]||0) + 1;
+      map[key].total++;
+    }
+    const known = KNOWN_CLOSURE_ORDER.filter(s=>statusSet.has(s));
+    const extra = Array.from(statusSet).filter(s=>!KNOWN_CLOSURE_ORDER.includes(s)).sort();
+    const statuses = known.concat(extra);
+    return { rows: Object.values(map), statuses };
+  }
+
+  function computeAndRenderClosure(which, idCols, rows){
+    const data = computeClosure(rows, idCols);
+    const tabKey = which === 'hub' ? 'hubclosure' : 'riderclosure';
+    sortDataset(data.rows, sortState[tabKey]);
+    if(which === 'hub') hubClosureData = data; else riderClosureData = data;
+    renderClosureTable(which, idCols);
+  }
+
+  function renderClosureTable(which, idCols){
+    const data = which === 'hub' ? hubClosureData : riderClosureData;
+    const tabKey = which === 'hub' ? 'hubclosure' : 'riderclosure';
+    const headId = which === 'hub' ? 'hubClosureHead' : 'riderClosureHead';
+    const bodyId = which === 'hub' ? 'hubClosureBody' : 'riderClosureBody';
+    const countId = which === 'hub' ? 'hubClosureRowCount' : 'riderClosureRowCount';
+
+    const colsDef = [
+      ...idCols.map(c=>({key:c.key, label:c.label})),
+      {key:'date', label:'Date'},
+      {key:'total', label:'Total'},
+      ...data.statuses.map(s=>({key:s, label:s}))
+    ];
+
+    const head = document.getElementById(headId);
+    if(head){
+      head.innerHTML = colsDef.map(c=>`<th data-key="${escapeHtml(c.key)}" data-tab="${tabKey}"><span class="th-inner">${escapeHtml(c.label)}<span class="sort-arrow">⇅</span></span></th>`).join('');
+      attachSortHandlers(head, tabKey, ()=> { sortDataset(data.rows, sortState[tabKey]); renderClosureTable(which, idCols); });
+      markSortedHeader(head, sortState[tabKey]);
+    }
+    const body = document.getElementById(bodyId);
+    if(body){
+      body.innerHTML = data.rows.map(r=>{
+        let cells = idCols.map(c=>`<td>${escapeHtml(r[c.key] || '(blank)')}</td>`).join('');
+        cells += `<td>${escapeHtml(r.date || '(blank)')}</td>`;
+        cells += `<td class="num">${r.total.toLocaleString()}</td>`;
+        cells += data.statuses.map(s=>`<td class="num">${(r[s]||0).toLocaleString()}</td>`).join('');
+        return `<tr>${cells}</tr>`;
+      }).join('') || `<tr><td colspan="${colsDef.length}" style="text-align:center;color:var(--muted);padding:24px;">No rows match the current filters</td></tr>`;
+    }
+    const cnt = document.getElementById(countId);
+    if(cnt) cnt.textContent = data.rows.length.toLocaleString() + ' group(s) · ' + data.statuses.length + ' status columns';
+  }
+
+  // ---------------------------------------------------------------
+  // Fake Runsheet tab — one row per runsheet_id
+  // ---------------------------------------------------------------
+  // Fake-runsheet rule:
+  //   FWD runsheets: Fake = Yes when DSR% <= 20%, else No.
+  //   REV runsheets: with 3 or fewer orders, never flagged (No).
+  //                  with 4+ orders, Fake = Yes when DSR% <= 20%, else No.
+  function computeFakeFlag(type, orderCount, dsrPct){
+    const t = (type||'').toString().trim().toUpperCase();
+    if(t === 'FWD'){
+      return dsrPct <= 20 ? 'Yes' : 'No';
+    }
+    if(t === 'REV'){
+      if(orderCount <= 3) return 'No';
+      return dsrPct <= 20 ? 'Yes' : 'No';
+    }
+    return 'No';
+  }
+
+  function computeFakeRunsheet(rows){
+    const map = {};
+    for(let i=0;i<rows.length;i++){
+      const r = rows[i];
+      const id = r[RUNSHEET_ID_COL]===undefined||r[RUNSHEET_ID_COL]===null ? '' : String(r[RUNSHEET_ID_COL]);
+      if(id === '') continue;
+      if(!map[id]){
+        map[id] = {
+          runsheetId: id,
+          hub: r[HUB_COL]===undefined||r[HUB_COL]===null ? '' : String(r[HUB_COL]),
+          date: r[DATE_COL]===undefined||r[DATE_COL]===null ? '' : String(r[DATE_COL]),
+          riderId: r[RIDER_ID_COL]===undefined||r[RIDER_ID_COL]===null ? '' : String(r[RIDER_ID_COL]),
+          riderName: r[RIDER_COL]===undefined||r[RIDER_COL]===null ? '' : String(r[RIDER_COL]),
+          type: r[TYPE_COL]===undefined||r[TYPE_COL]===null ? '' : String(r[TYPE_COL]),
+          orders: 0,
+          success: 0
+        };
+      }
+      const o = map[id];
+      o.orders++;
+      const dsr = (r[DSR_COL]||'').toString().trim().toLowerCase();
+      if(dsr === 'delivered' || dsr === 'picked') o.success++;
+    }
+    return Object.values(map).map(o=>{
+      const dsrPct = o.orders ? (o.success/o.orders*100) : 0;
+      return { ...o, dsrPct, fake: computeFakeFlag(o.type, o.orders, dsrPct) };
+    });
+  }
+
+  function computeAndRenderFakeRunsheet(rows){
+    const data = computeFakeRunsheet(rows);
+    sortDataset(data, sortState.fakerunsheet);
+    fakeRunsheetData = data;
+    renderFakeRunsheetTable();
+  }
+
+  function getFilteredFakeRunsheetData(){
+    if(fakeRunsheetFilterValue === 'all') return fakeRunsheetData;
+    return fakeRunsheetData.filter(o => o.fake === fakeRunsheetFilterValue);
+  }
+
+  function renderFakeRunsheetTable(){
+    const colsDef = [
+      {key:'hub', label:'Hub Name'},
+      {key:'date', label:'Runsheet Date'},
+      {key:'runsheetId', label:'Runsheet ID'},
+      {key:'riderName', label:'Rider Name'},
+      {key:'type', label:'Type'},
+      {key:'orders', label:'Order'},
+      {key:'success', label:'Sucess'},
+      {key:'dsrPct', label:'DSR %'},
+      {key:'fake', label:'Fake Runsheet'}
+    ];
+    const head = document.getElementById('fakeRunsheetHead');
+    if(head){
+      head.innerHTML = colsDef.map(c=>`<th data-key="${escapeHtml(c.key)}" data-tab="fakerunsheet"><span class="th-inner">${escapeHtml(c.label)}<span class="sort-arrow">⇅</span></span></th>`).join('');
+      attachSortHandlers(head, 'fakerunsheet', ()=> { sortDataset(fakeRunsheetData, sortState.fakerunsheet); renderFakeRunsheetTable(); });
+      markSortedHeader(head, sortState.fakerunsheet);
+    }
+
+    const data = getFilteredFakeRunsheetData();
+    const body = document.getElementById('fakeRunsheetBody');
+    if(body){
+      body.innerHTML = data.map(o=>{
+        let cells = `<td>${escapeHtml(o.hub || '(blank)')}</td>`;
+        cells += `<td>${escapeHtml(o.date || '(blank)')}</td>`;
+        cells += `<td>${escapeHtml(o.runsheetId || '(blank)')}</td>`;
+        cells += `<td>${escapeHtml(o.riderName || '(blank)')}</td>`;
+        cells += `<td>${escapeHtml(o.type || '(blank)')}</td>`;
+        cells += `<td class="num">${o.orders.toLocaleString()}</td>`;
+        cells += `<td class="num">${o.success.toLocaleString()}</td>`;
+        cells += `<td class="num">${pctPill(o.dsrPct)}</td>`;
+        const fakeCls = o.fake === 'Yes' ? 'pct-bad' : 'pct-good';
+        cells += `<td><span class="pct-pill ${fakeCls}">${o.fake}</span></td>`;
+        return `<tr>${cells}</tr>`;
+      }).join('') || `<tr><td colspan="${colsDef.length}" style="text-align:center;color:var(--muted);padding:24px;">No rows match the current filters</td></tr>`;
+    }
+    const cnt = document.getElementById('fakeRunsheetRowCount');
+    if(cnt) cnt.textContent = data.length.toLocaleString() + ' runsheet(s) of ' + fakeRunsheetData.length.toLocaleString();
+  }
+
+  // ---------------------------------------------------------------
+  // Status Trend tab — AWB count by 30-min Update Time bucket
+  // ---------------------------------------------------------------
+  function parseTimeOfDayMinutes(v){
+    if(v===undefined||v===null||v==='') return NaN;
+    const s = String(v).trim();
+    let m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|am|pm)?/);
+    if(m){
+      let hh = parseInt(m[1],10);
+      const mm = parseInt(m[2],10);
+      const ap = m[3];
+      if(ap){
+        const apu = ap.toUpperCase();
+        if(apu==='PM' && hh<12) hh+=12;
+        if(apu==='AM' && hh===12) hh=0;
+      }
+      if(hh>=0 && hh<24 && mm>=0 && mm<60) return hh*60+mm;
+    }
+    const t = Date.parse(s);
+    if(!isNaN(t)){
+      const d = new Date(t);
+      return d.getHours()*60 + d.getMinutes();
+    }
+    return NaN;
+  }
+  function roundDownTo30(mins){ return Math.floor(mins/30)*30; }
+  function minutesToLabel(mins){
+    const hh = Math.floor(mins/60), mm = mins%60;
+    return String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+  }
+
+  function computeStatusTrend(rows){
+    const buckets = {};
+    for(let i=0;i<48;i++) buckets[i*30] = 0;
+    let parsedCount = 0;
+    rows.forEach(r=>{
+      const mins = parseTimeOfDayMinutes(r[TREND_TIME_COL]);
+      if(!isNaN(mins)){
+        const b = roundDownTo30(mins);
+        buckets[b] = (buckets[b]||0) + 1;
+        parsedCount++;
+      }
+    });
+    const orderedKeys = Object.keys(buckets).map(Number).sort((a,b)=>a-b);
+    return {
+      labels: orderedKeys.map(minutesToLabel),
+      counts: orderedKeys.map(k=>buckets[k]),
+      parsedCount, total: rows.length
+    };
+  }
+
+  function renderTrendChart(rows){
+    const canvas = document.getElementById('trendChart');
+    if(!canvas) return;
+    const trend = computeStatusTrend(rows);
+
+    if(charts.trend) charts.trend.destroy();
+    charts.trend = new Chart(canvas.getContext('2d'), {
+      type:'bar',
+      data:{ labels: trend.labels, datasets:[{ label:'AWB Count', data: trend.counts, backgroundColor:'#2f6fed', borderRadius:3, maxBarThickness:18 }] },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{
+          y:{ beginAtZero:true, grid:{color:'#e9edf3'}, title:{display:true, text:'AWB Count'} },
+          x:{ grid:{display:false}, ticks:{maxRotation:90, minRotation:90, autoSkip:true, maxTicksLimit:48}, title:{display:true, text:'Update Time (rounded to 30 min)'} }
+        }
+      }
+    });
+
+    const note = document.getElementById('trendNote');
+    if(note){
+      const pct = trend.total ? (trend.parsedCount/trend.total*100).toFixed(1) : '0.0';
+      note.textContent = `Parsed time-of-day for ${trend.parsedCount.toLocaleString()} of ${trend.total.toLocaleString()} filtered rows (${pct}%). Rows with an unrecognized "${TREND_TIME_COL}" format are excluded from the chart.`;
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Raw Data tab
+  // ---------------------------------------------------------------
+  function getRawDataRows(){
+    if(filteredRowsCache) return filteredRowsCache;
+    let rows = getGlobalFilteredRows();
+    if(currentSearch){
+      rows = rows.filter(r=>{
+        for(let i=0;i<liveData.columns.length;i++){
+          if(String(r[liveData.columns[i]]).toLowerCase().includes(currentSearch)) return true;
+        }
+        return false;
+      });
+    }
+    if(sortState.rawdata.key){
+      rows = rows.slice();
+      const key = sortState.rawdata.key, dir = sortState.rawdata.dir, dateLike = isDateLikeKey(key);
+      const mult = dir === 'asc' ? 1 : -1;
+      rows.sort((a,b)=> compareValues(a[key], b[key], dateLike) * mult);
+    }
+    filteredRowsCache = rows;
+    return rows;
+  }
+
+  function renderRawDataTable(){
+    if(!liveData) return;
+    const rows = getRawDataRows();
+    const rowCnt = document.getElementById('rowCount');
+    if(rowCnt) rowCnt.textContent = rows.length.toLocaleString() + ' rows';
+
+    const totalPages = Math.max(1, Math.ceil(rows.length / TABLE_PAGE_SIZE));
+    if(currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage-1)*TABLE_PAGE_SIZE;
+    const pageRows = rows.slice(start, start+TABLE_PAGE_SIZE);
+
+    const body = document.getElementById('mainBody');
+    if(body){
+      body.innerHTML = pageRows.map(r=>{
+        return '<tr><td><span class="src-tag">'+escapeHtml(r.__sheet)+'</span></td>' +
+               liveData.columns.map(c=>`<td>${escapeHtml(formatCell(r[c]))}</td>`).join('') + '</tr>';
+      }).join('');
+    }
+
+    const pgInfo = document.getElementById('pageInfo');
+    if(pgInfo) pgInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    const pBtn = document.getElementById('prevPage');
+    const nBtn = document.getElementById('nextPage');
+    if(pBtn) pBtn.disabled = currentPage<=1;
+    if(nBtn) nBtn.disabled = currentPage>=totalPages;
+
+    markSortedHeader(document.getElementById('mainHead'), sortState.rawdata);
+  }
+
+  // ---------------------------------------------------------------
+  // Generic sort helpers (shared by every tab table)
+  // ---------------------------------------------------------------
+  function sortDataset(arr, state){
+    if(!state.key) return;
+    const dateLike = isDateLikeKey(state.key);
+    const mult = state.dir === 'asc' ? 1 : -1;
+    arr.sort((a,b)=> compareValues(a[state.key], b[state.key], dateLike) * mult);
+  }
+
+  function attachSortHandlers(headEl, tabName, onSortedCallback){
+    if(!headEl) return;
+    headEl.querySelectorAll('th[data-key]').forEach(th=>{
+      th.onclick = ()=>{
+        const key = th.dataset.key;
+        const st = sortState[tabName];
+        if(st.key === key){ st.dir = st.dir === 'asc' ? 'desc' : 'asc'; }
+        else { st.key = key; st.dir = 'asc'; }
+
+        if(tabName === 'rawdata'){ filteredRowsCache = null; currentPage = 1; renderRawDataTable(); }
+        else if(onSortedCallback){ onSortedCallback(); }
+      };
+    });
+  }
+
+  function markSortedHeader(headEl, state){
+    if(!headEl) return;
+    headEl.querySelectorAll('th[data-key]').forEach(th=>{
+      const arrow = th.querySelector('.sort-arrow');
+      if(state.key && th.dataset.key === state.key){
+        th.classList.add('sorted');
+        if(arrow) arrow.textContent = state.dir === 'asc' ? '▲' : '▼';
+      } else {
+        th.classList.remove('sorted');
+        if(arrow) arrow.textContent = '⇅';
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Export / download helpers
+  // ---------------------------------------------------------------
+  function downloadJSONStreamChunked(obj, baseFileName) {
+    const parts = [];
+    parts.push('{\n  "columns": ' + JSON.stringify(obj.columns) + ',\n');
+    parts.push('  "sheetCounts": ' + JSON.stringify(obj.sheetCounts) + ',\n');
+    parts.push('  "fileName": ' + JSON.stringify(obj.fileName) + ',\n');
+    parts.push('  "fileSize": ' + JSON.stringify(obj.fileSize) + ',\n');
+    parts.push('  "savedAt": ' + JSON.stringify(obj.savedAt) + ',\n');
+    parts.push('  "rows": [\n');
+
+    const totalRows = obj.rows.length;
+    const chunkSize = 1000;
+    for (let i = 0; i < totalRows; i += chunkSize) {
+      const chunk = obj.rows.slice(i, i + chunkSize);
+      let chunkStr = chunk.map((row, index) => {
+        const isLastRow = (i + index) === (totalRows - 1);
+        return '    ' + JSON.stringify(row) + (isLastRow ? '' : ',');
+      }).join('\n');
+      if (i + chunkSize < totalRows) chunkStr += '\n,';
+      parts.push(chunkStr);
+    }
+    parts.push('\n  ]\n}');
+
+    const blob = new Blob(parts, { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${baseFileName}.json`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadCSV(rows, columns, baseFileName) {
+    if (!rows || rows.length === 0) return;
+    const csvContent = Papa.unparse({ fields: columns, data: rows });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${baseFileName}_${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function escapeHtml(s){
+    if(s===null||s===undefined) return '';
+    return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+  function formatCell(v){ if(v instanceof Date) return v.toLocaleDateString(); return v; }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    initUIHandlers();
+    loadPublishedReportOnStartup();
+  });
+})();
+</script>
+</body>
+</html>
